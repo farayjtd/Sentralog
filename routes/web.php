@@ -14,3 +14,7 @@ Route::prefix('admin')->group(function () {
     Route::get('/tasks', function () { return view('admin.tasks'); });
     Route::get('/inventory', function () { return view('admin.inventory'); });
 });
+
+Route::get('/dashboard-tukang', function () {
+    return view('tukang.index');
+});
