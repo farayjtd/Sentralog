@@ -31,3 +31,21 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     detectSessionInUrl: false,
   },
 })
+
+export const manageUser = async (action: string, payload: any) => {
+  const { data: { session } } = await supabase.auth.getSession()
+
+  const response = await fetch(
+    'https://epynoopvlibfrjunkula.supabase.co/functions/v1/manage-user',
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session?.access_token}`,
+      },
+      body: JSON.stringify({ action, payload }),
+    }
+  )
+
+  return response.json()
+}

@@ -1,20 +1,20 @@
 import { useState } from 'react'
-import { View, Text, StyleSheet, StatusBar, Platform } from 'react-native'
+import { View, Text, StyleSheet, StatusBar } from 'react-native'
 import AdminSidebar from '../../components/AdminSidebar'
 import AdminHeader from '../../components/AdminHeader'
 
-export default function AdminDashboard() {
+export default function ProjectPage() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
-
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#1a1a2e" />
-      <AdminHeader title="Dashboard" onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
+      <AdminHeader title="Data Project" onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
       <View style={styles.body}>
         {sidebarOpen && <AdminSidebar />}
         <View style={styles.main}>
-          <Text style={styles.title}>Selamat Datang 👋</Text>
-          <Text style={styles.sub}>Pilih menu di sidebar untuk mulai mengelola data.</Text>
+          <Text style={styles.icon}>📋</Text>
+          <Text style={styles.title}>Manajemen Project</Text>
+          <Text style={styles.sub}>Segera hadir</Text>
         </View>
       </View>
     </View>
@@ -24,7 +24,8 @@ export default function AdminDashboard() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f0f2f5' },
   body: { flex: 1, flexDirection: 'row' },
-  main: { flex: 1, padding: 24, justifyContent: 'center', alignItems: 'center' },
-  title: { fontSize: 22, fontWeight: 'bold', color: '#1a1a2e', marginBottom: 8 },
-  sub: { fontSize: 14, color: '#888', textAlign: 'center' },
+  main: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  icon: { fontSize: 48, marginBottom: 12 },
+  title: { fontSize: 20, fontWeight: 'bold', color: '#1a1a2e', marginBottom: 6 },
+  sub: { fontSize: 14, color: '#888' },
 })
