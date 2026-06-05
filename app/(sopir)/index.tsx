@@ -1,4 +1,4 @@
-import DashboardScreen from '../../components/DashboardScreen'
+import AbsenDashboard from '../../components/AbsenDashboard'
 export default function SopirDashboard() {
-  return <DashboardScreen roleName="Sopir" color="#e65100" />
+  return <AbsenDashboard roleName="Sopir" color="#e65100" absenRoute="/(sopir)/absen" />
 }

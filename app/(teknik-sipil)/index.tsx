@@ -1,4 +1,4 @@
-import DashboardScreen from '../../components/DashboardScreen'
+import AbsenDashboard from '../../components/AbsenDashboard'
 export default function TeknikSipilDashboard() {
-  return <DashboardScreen roleName="Teknik Sipil" color="#1565c0" />
+  return <AbsenDashboard roleName="Teknik Sipil" color="#1565c0" absenRoute="/(teknik-sipil)/absen" />
 }

@@ -1,4 +1,4 @@
-import DashboardScreen from '../../components/DashboardScreen'
+import AbsenDashboard from '../../components/AbsenDashboard'
 export default function KepalaWHDashboard() {
-  return <DashboardScreen roleName="Kepala Warehouse" color="#6a1b9a" />
+  return <AbsenDashboard roleName="Kepala Warehouse" color="#6a1b9a" absenRoute="/(kepala-wh)/absen" />
 }

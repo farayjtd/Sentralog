@@ -1,4 +1,11 @@
-import DashboardScreen from '../../components/DashboardScreen'
+import AbsenDashboard from '../../components/AbsenDashboard'
+
 export default function TukangDashboard() {
-  return <DashboardScreen roleName="Tukang" color="#37474f" />
+  return (
+    <AbsenDashboard
+      roleName="Tukang"
+      color="#37474f"
+      absenRoute="/(tukang)/absen"
+    />
+  )
 }
