@@ -22,14 +22,16 @@ interface Project {
   install_lng: number
 }
 
+type LocationRule = 'wh_only' | 'lapangan_only' | 'both' | 'free'
+
 interface Props {
   roleName: string
   color: string
   backRoute: string
-  requireGeofencing?: boolean
+  locationRule: LocationRule
 }
 
-const GEOFENCE_RADIUS = 200 // meter
+const GEOFENCE_RADIUS = 200
 
 function getDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371000
@@ -41,17 +43,16 @@ function getDistance(lat1: number, lng1: number, lat2: number, lng2: number): nu
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 }
 
-export default function AbsenForm({ roleName, color, backRoute, requireGeofencing = true }: Props) {
+export default function AbsenForm({ roleName, color, backRoute, locationRule }: Props) {
   const router = useRouter()
   const { user } = useAuthStore()
   const [step, setStep] = useState<'pilih' | 'foto' | 'proses' | 'selesai'>('pilih')
-  const [locationType, setLocationType] = useState<'wh' | 'lapangan' | null>(null)
+  const [locationType, setLocationType] = useState<'wh' | 'lapangan' | 'kantor' | null>(null)
   const [warehouses, setWarehouses] = useState<Warehouse[]>([])
   const [projects, setProjects] = useState<Project[]>([])
   const [selectedWH, setSelectedWH] = useState<Warehouse | null>(null)
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
-  const [photoUri, setPhotoUri] = useState<string>('')
-  const [uploading, setUploading] = useState(false)
+  const [photoUri, setPhotoUri] = useState('')
   const [gpsStatus, setGpsStatus] = useState<'idle' | 'checking' | 'ok' | 'fake' | 'error' | 'jauh'>('idle')
   const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null)
   const [showCamera, setShowCamera] = useState(false)
@@ -60,68 +61,111 @@ export default function AbsenForm({ roleName, color, backRoute, requireGeofencin
   const streamRef = useRef<any>(null)
 
   useEffect(() => {
-    fetchWarehouses()
-    fetchProjects()
+    // Auto set locationType jika hanya satu pilihan
+    if (locationRule === 'wh_only') setLocationType('wh')
+    if (locationRule === 'lapangan_only') setLocationType('lapangan')
+    if (locationRule === 'free') setLocationType('kantor')
+
+    fetchData()
   }, [])
 
-  const fetchWarehouses = async () => {
-    const { data } = await supabase
-      .from('warehouses')
-      .select('id, name, lat, lng')
-      .eq('is_active', true)
-    if (data) setWarehouses(data)
-  }
-
-  const fetchProjects = async () => {
+  const fetchData = async () => {
     if (!user) return
-    const { data } = await supabase
-      .from('projects')
-      .select('id, name, install_lat, install_lng')
-      .in('status', ['pengiriman', 'pemasangan'])
-    if (data) setProjects(data)
+
+    if (locationRule === 'wh_only' || locationRule === 'both') {
+      // Kepala WH hanya fetch WH yang dia kepalai
+      if (locationRule === 'wh_only') {
+        const { data } = await supabase
+          .from('warehouses')
+          .select('id, name, lat, lng')
+          .eq('head_user_id', user.id)
+          .eq('is_active', true)
+        if (data) setWarehouses(data)
+      } else {
+        // Tukang bisa semua WH
+        const { data } = await supabase
+          .from('warehouses')
+          .select('id, name, lat, lng')
+          .eq('is_active', true)
+        if (data) setWarehouses(data)
+      }
+    }
+
+    if (locationRule === 'lapangan_only' || locationRule === 'both') {
+      // Fetch project yang sedang dalam tahap pemasangan
+      const { data } = await supabase
+        .from('projects')
+        .select('id, name, install_lat, install_lng')
+        .in('status', ['pengiriman', 'pemasangan'])
+      if (data) setProjects(data)
+    }
+
+    if (locationRule === 'wh_only' && roleName === 'Sopir') {
+      // Sopir hanya bisa absen di WH saat ada tugas pengiriman
+      const { data: deliveries } = await supabase
+        .from('deliveries')
+        .select('project:project_id(warehouse_id)')
+        .eq('driver_id', user.id)
+        .eq('status', 'disiapkan')
+
+      if (deliveries?.length) {
+        const whIds = deliveries
+          .map((d: any) => d.project?.warehouse_id)
+          .filter(Boolean)
+        const { data: whs } = await supabase
+          .from('warehouses')
+          .select('id, name, lat, lng')
+          .in('id', whIds)
+        if (whs) setWarehouses(whs)
+      }
+    }
   }
 
   const checkGPS = async (targetLat?: number, targetLng?: number): Promise<boolean> => {
     setGpsStatus('checking')
-    try {
-      if (Platform.OS === 'web') {
-        return new Promise((resolve) => {
-          if (!navigator.geolocation) {
-            // Jika tidak ada geolocation, tetap izinkan absen
+
+    if (locationRule === 'free') {
+      setGpsStatus('ok')
+      setCurrentLocation({ lat: 0, lng: 0 })
+      return true
+    }
+
+    if (Platform.OS === 'web') {
+      return new Promise((resolve) => {
+        if (!navigator.geolocation) {
+          setGpsStatus('ok')
+          setCurrentLocation({ lat: 0, lng: 0 })
+          resolve(true)
+          return
+        }
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            const lat = pos.coords.latitude
+            const lng = pos.coords.longitude
+            setCurrentLocation({ lat, lng })
+            if (targetLat && targetLng) {
+              const dist = getDistance(lat, lng, targetLat, targetLng)
+              if (dist > GEOFENCE_RADIUS) {
+                setGpsStatus('jauh')
+                Alert.alert('Diluar Radius', `Anda berada ${Math.round(dist)}m dari lokasi. Maksimal ${GEOFENCE_RADIUS}m.`)
+                resolve(false)
+                return
+              }
+            }
+            setGpsStatus('ok')
+            resolve(true)
+          },
+          () => {
             setGpsStatus('ok')
             setCurrentLocation({ lat: 0, lng: 0 })
             resolve(true)
-            return
-          }
-          navigator.geolocation.getCurrentPosition(
-            (pos) => {
-              const lat = pos.coords.latitude
-              const lng = pos.coords.longitude
-              setCurrentLocation({ lat, lng })
+          },
+          { enableHighAccuracy: true, timeout: 10000 }
+        )
+      })
+    }
 
-              if (requireGeofencing && targetLat && targetLng) {
-                const dist = getDistance(lat, lng, targetLat, targetLng)
-                if (dist > GEOFENCE_RADIUS) {
-                  setGpsStatus('jauh')
-                  Alert.alert('Diluar Radius', `Anda berada ${Math.round(dist)} meter dari lokasi. Maksimal ${GEOFENCE_RADIUS} meter.`)
-                  resolve(false)
-                  return
-                }
-              }
-              setGpsStatus('ok')
-              resolve(true)
-            },
-            (err) => {
-              console.log('GPS error web:', err)
-              setGpsStatus('ok')
-              setCurrentLocation({ lat: 0, lng: 0 })
-              resolve(true)
-            },
-            { enableHighAccuracy: true, timeout: 10000 }
-          )
-        })
-      }
-
+    try {
       const { status } = await Location.requestForegroundPermissionsAsync()
       if (status !== 'granted') {
         setGpsStatus('error')
@@ -139,11 +183,11 @@ export default function AbsenForm({ roleName, color, backRoute, requireGeofencin
 
       setCurrentLocation({ lat: loc.coords.latitude, lng: loc.coords.longitude })
 
-      if (requireGeofencing && targetLat && targetLng) {
+      if (targetLat && targetLng) {
         const dist = getDistance(loc.coords.latitude, loc.coords.longitude, targetLat, targetLng)
         if (dist > GEOFENCE_RADIUS) {
           setGpsStatus('jauh')
-          Alert.alert('Diluar Radius', `Anda berada ${Math.round(dist)} meter dari lokasi. Maksimal ${GEOFENCE_RADIUS} meter.`)
+          Alert.alert('Diluar Radius', `Anda berada ${Math.round(dist)}m dari lokasi. Maksimal ${GEOFENCE_RADIUS}m.`)
           return false
         }
       }
@@ -151,7 +195,6 @@ export default function AbsenForm({ roleName, color, backRoute, requireGeofencin
       setGpsStatus('ok')
       return true
     } catch (e) {
-      console.log('GPS catch error:', e)
       setGpsStatus('error')
       Alert.alert('Error', 'Gagal mendapatkan lokasi GPS')
       return false
@@ -159,26 +202,24 @@ export default function AbsenForm({ roleName, color, backRoute, requireGeofencin
   }
 
   const openCamera = async () => {
-    if (Platform.OS === 'web') {
-      setShowCamera(true)
-      setTimeout(async () => {
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false })
-          streamRef.current = stream
-          if (videoRef.current) {
-            videoRef.current.srcObject = stream
-            videoRef.current.play()
-          }
-        } catch (e) {
-          Alert.alert('Error', 'Gagal akses kamera')
-          setShowCamera(false)
+    setShowCamera(true)
+    setTimeout(async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false })
+        streamRef.current = stream
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream
+          videoRef.current.play()
         }
-      }, 300)
-    }
+      } catch (e) {
+        Alert.alert('Error', 'Gagal akses kamera')
+        setShowCamera(false)
+      }
+    }, 300)
   }
 
   const capturePhoto = () => {
-    if (Platform.OS === 'web' && videoRef.current && canvasRef.current) {
+    if (videoRef.current && canvasRef.current) {
       const video = videoRef.current
       const canvas = canvasRef.current
       canvas.width = video.videoWidth
@@ -199,36 +240,19 @@ export default function AbsenForm({ roleName, color, backRoute, requireGeofencin
     }
   }
 
-  const retakePhoto = () => {
-    setPhotoUri('')
-    openCamera()
-  }
-
   const uploadPhoto = async (userId: string, date: string): Promise<string | null> => {
-    if (!photoUri) {
-      console.log('Upload photo: photoUri kosong')
-      return null
-    }
+    if (!photoUri) return null
     try {
-      console.log('Mulai upload foto...')
       const response = await fetch(photoUri)
       const blob = await response.blob()
-      console.log('Blob type:', blob.type, 'size:', blob.size)
       const fileName = `${userId}/${date}-${Date.now()}.jpg`
-      console.log('Upload ke:', fileName)
-
-      const { data, error } = await supabase.storage
+      const { error } = await supabase.storage
         .from('attendance-photos')
         .upload(fileName, blob, { upsert: true, contentType: 'image/jpeg' })
-
-      console.log('Upload result:', data, error)
-
       if (error) throw error
-      const { data: urlData } = supabase.storage.from('attendance-photos').getPublicUrl(fileName)
-      console.log('Public URL:', urlData.publicUrl)
-      return urlData.publicUrl
+      const { data } = supabase.storage.from('attendance-photos').getPublicUrl(fileName)
+      return data.publicUrl
     } catch (e: any) {
-      console.log('Upload error:', e)
       Alert.alert('Error', 'Gagal upload foto: ' + e.message)
       return null
     }
@@ -238,53 +262,45 @@ export default function AbsenForm({ roleName, color, backRoute, requireGeofencin
     if (!user || !locationType) return
     if (!photoUri) { Alert.alert('Perhatian', 'Foto selfie wajib diambil'); return }
 
-    console.log('handleSubmit dipanggil')
-    console.log('photoUri length:', photoUri.length)
-    console.log('user id:', user.id)
-    console.log('locationType:', locationType)
-
-    const targetLat = locationType === 'wh' ? selectedWH?.lat : selectedProject?.install_lat
-    const targetLng = locationType === 'wh' ? selectedWH?.lng : selectedProject?.install_lng
+    const targetLat = locationType === 'wh' ? selectedWH?.lat : locationType === 'lapangan' ? selectedProject?.install_lat : undefined
+    const targetLng = locationType === 'wh' ? selectedWH?.lng : locationType === 'lapangan' ? selectedProject?.install_lng : undefined
 
     setStep('proses')
-    setUploading(true)
 
     let isMockGps = false
+    let loc = currentLocation
 
-    if (Platform.OS === 'web') {
+    if (locationRule === 'free') {
       setGpsStatus('ok')
-      setCurrentLocation({ lat: 0, lng: 0 })
+    } else if (Platform.OS === 'web') {
+      setGpsStatus('ok')
+      loc = { lat: 0, lng: 0 }
     } else {
       const gpsOk = await checkGPS(targetLat, targetLng)
       if (!gpsOk && gpsStatus !== 'fake') {
         setStep('foto')
-        setUploading(false)
         return
       }
       isMockGps = gpsStatus === 'fake'
+      loc = currentLocation
     }
 
     const today = new Date().toISOString().split('T')[0]
     const photoUrl = await uploadPhoto(user.id, today)
-    console.log('photoUrl hasil upload:', photoUrl)
 
     const { error } = await supabase.from('attendances').insert({
       user_id: user.id,
       warehouse_id: locationType === 'wh' ? selectedWH?.id : null,
       project_id: locationType === 'lapangan' ? selectedProject?.id : null,
       date: today,
-      location_type: locationType,
+      location_type: locationType === 'kantor' ? 'wh' : locationType,
       check_in_at: new Date().toISOString(),
-      check_in_lat: currentLocation?.lat ?? null,
-      check_in_lng: currentLocation?.lng ?? null,
+      check_in_lat: loc?.lat ?? null,
+      check_in_lng: loc?.lng ?? null,
       check_in_photo: photoUrl,
       is_mock_gps: isMockGps,
       is_manual: false,
     })
-
-    console.log('Insert attendance error:', error)
-
-    setUploading(false)
 
     if (error) {
       Alert.alert('Error', error.message)
@@ -295,7 +311,7 @@ export default function AbsenForm({ roleName, color, backRoute, requireGeofencin
     setStep('selesai')
   }
 
-  const handleLanjutPilih = async () => {
+  const handleLanjut = async () => {
     if (locationType === 'wh' && !selectedWH) {
       Alert.alert('Perhatian', 'Pilih warehouse terlebih dahulu')
       return
@@ -307,11 +323,11 @@ export default function AbsenForm({ roleName, color, backRoute, requireGeofencin
     await openCamera()
   }
 
+  const showLocationPicker = locationRule === 'both'
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={color} />
-
-      {/* Header */}
       <View style={[styles.header, { backgroundColor: color }]}>
         <TouchableOpacity onPress={() => { stopCamera(); router.replace(backRoute as any) }} style={styles.backBtn}>
           <Text style={styles.backText}>‹ Kembali</Text>
@@ -322,40 +338,77 @@ export default function AbsenForm({ roleName, color, backRoute, requireGeofencin
 
       <ScrollView style={styles.scroll} contentContainerStyle={{ padding: 16 }}>
 
-        {/* STEP 1: Pilih Lokasi */}
         {step === 'pilih' && (
           <View>
-            <Text style={styles.stepTitle}>Pilih Lokasi Absen</Text>
+            <Text style={styles.stepTitle}>
+              {locationRule === 'free' ? 'Absen Kantor' : 'Pilih Lokasi Absen'}
+            </Text>
 
-            <TouchableOpacity
-              style={[styles.locOption, locationType === 'wh' && { borderColor: color, backgroundColor: color + '10' }]}
-              onPress={() => setLocationType('wh')}
-            >
-              <Text style={styles.locOptionIcon}>🏭</Text>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.locOptionTitle}>Absen di Warehouse</Text>
-                <Text style={styles.locOptionSub}>Berada di lokasi gudang</Text>
-              </View>
-              {locationType === 'wh' && <Text style={{ color }}>✓</Text>}
-            </TouchableOpacity>
+            {/* Pilih tipe lokasi hanya jika both */}
+            {showLocationPicker && (
+              <View style={{ marginBottom: 16 }}>
+                <TouchableOpacity
+                  style={[styles.locOption, locationType === 'wh' && { borderColor: color, backgroundColor: color + '10' }]}
+                  onPress={() => setLocationType('wh')}
+                >
+                  <Text style={styles.locOptionIcon}>🏭</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.locOptionTitle}>Absen di Warehouse</Text>
+                    <Text style={styles.locOptionSub}>Berada di lokasi gudang</Text>
+                  </View>
+                  {locationType === 'wh' && <Text style={{ color }}>✓</Text>}
+                </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[styles.locOption, locationType === 'lapangan' && { borderColor: color, backgroundColor: color + '10' }]}
-              onPress={() => setLocationType('lapangan')}
-            >
-              <Text style={styles.locOptionIcon}>📍</Text>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.locOptionTitle}>Absen di Lapangan</Text>
-                <Text style={styles.locOptionSub}>Berada di lokasi project</Text>
+                <TouchableOpacity
+                  style={[styles.locOption, locationType === 'lapangan' && { borderColor: color, backgroundColor: color + '10' }]}
+                  onPress={() => setLocationType('lapangan')}
+                >
+                  <Text style={styles.locOptionIcon}>📍</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.locOptionTitle}>Absen di Lapangan</Text>
+                    <Text style={styles.locOptionSub}>Berada di lokasi project</Text>
+                  </View>
+                  {locationType === 'lapangan' && <Text style={{ color }}>✓</Text>}
+                </TouchableOpacity>
               </View>
-              {locationType === 'lapangan' && <Text style={{ color }}>✓</Text>}
-            </TouchableOpacity>
+            )}
+
+            {/* Info lokasi untuk role tertentu */}
+            {locationRule === 'lapangan_only' && (
+              <View style={[styles.infoBox, { borderColor: color + '40', backgroundColor: color + '10' }]}>
+                <Text style={[styles.infoText, { color }]}>📍 Absen dilakukan di lokasi project yang sedang berjalan</Text>
+              </View>
+            )}
+
+            {locationRule === 'wh_only' && roleName !== 'Sopir' && (
+              <View style={[styles.infoBox, { borderColor: color + '40', backgroundColor: color + '10' }]}>
+                <Text style={[styles.infoText, { color }]}>🏭 Absen dilakukan di warehouse yang Anda kepalai</Text>
+              </View>
+            )}
+
+            {locationRule === 'wh_only' && roleName === 'Sopir' && (
+              <View style={[styles.infoBox, { borderColor: color + '40', backgroundColor: color + '10' }]}>
+                <Text style={[styles.infoText, { color }]}>🚛 Absen dilakukan di warehouse saat ada tugas pengiriman</Text>
+              </View>
+            )}
+
+            {locationRule === 'free' && (
+              <View style={[styles.infoBox, { borderColor: color + '40', backgroundColor: color + '10' }]}>
+                <Text style={[styles.infoText, { color }]}>🏢 Absen dapat dilakukan dari mana saja</Text>
+              </View>
+            )}
 
             {/* Pilih WH */}
-            {locationType === 'wh' && (
+            {(locationType === 'wh') && (
               <View style={styles.subSection}>
                 <Text style={styles.subLabel}>Pilih Warehouse</Text>
-                {warehouses.map(w => (
+                {warehouses.length === 0 ? (
+                  <Text style={styles.empty}>
+                    {roleName === 'Sopir'
+                      ? 'Tidak ada tugas pengiriman aktif'
+                      : 'Tidak ada warehouse tersedia'}
+                  </Text>
+                ) : warehouses.map(w => (
                   <TouchableOpacity
                     key={w.id}
                     style={[styles.subOption, selectedWH?.id === w.id && { borderColor: color, backgroundColor: color + '10' }]}
@@ -387,15 +440,15 @@ export default function AbsenForm({ roleName, color, backRoute, requireGeofencin
               </View>
             )}
 
-            {locationType && (
-              <TouchableOpacity style={[styles.nextBtn, { backgroundColor: color }]} onPress={handleLanjutPilih}>
-                <Text style={styles.nextBtnText}>Lanjut → Ambil Foto Selfie</Text>
-              </TouchableOpacity>
-            )}
+            <TouchableOpacity
+              style={[styles.nextBtn, { backgroundColor: color }]}
+              onPress={locationRule === 'free' ? () => openCamera() : handleLanjut}
+            >
+              <Text style={styles.nextBtnText}>Lanjut → Ambil Foto Selfie</Text>
+            </TouchableOpacity>
           </View>
         )}
 
-        {/* STEP 2: Preview Foto */}
         {step === 'foto' && (
           <View style={styles.fotoSection}>
             <Text style={styles.stepTitle}>Foto Selfie</Text>
@@ -403,7 +456,7 @@ export default function AbsenForm({ roleName, color, backRoute, requireGeofencin
               <View style={styles.photoWrap}>
                 <Image source={{ uri: photoUri }} style={styles.photoPreview} />
                 <Text style={styles.photoCaption}>Foto selfie berhasil diambil</Text>
-                <TouchableOpacity style={styles.retakeBtn} onPress={retakePhoto}>
+                <TouchableOpacity style={styles.retakeBtn} onPress={() => { setPhotoUri(''); openCamera() }}>
                   <Text style={styles.retakeBtnText}>📷 Ambil Ulang</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={[styles.submitBtn, { backgroundColor: color }]} onPress={handleSubmit}>
@@ -413,7 +466,7 @@ export default function AbsenForm({ roleName, color, backRoute, requireGeofencin
             ) : (
               <View style={styles.noPhotoWrap}>
                 <Text style={styles.noPhotoText}>Foto belum diambil</Text>
-                <TouchableOpacity style={[styles.nextBtn, { backgroundColor: color }]} onPress={openCamera}>
+                <TouchableOpacity style={[styles.nextBtn, { backgroundColor: color }]} onPress={() => openCamera()}>
                   <Text style={styles.nextBtnText}>📷 Buka Kamera</Text>
                 </TouchableOpacity>
               </View>
@@ -421,16 +474,14 @@ export default function AbsenForm({ roleName, color, backRoute, requireGeofencin
           </View>
         )}
 
-        {/* STEP 3: Proses */}
         {step === 'proses' && (
           <View style={styles.prosesSection}>
             <ActivityIndicator size="large" color={color} />
             <Text style={styles.prosesText}>Memproses absensi...</Text>
-            <Text style={styles.prosesSub}>Mengecek lokasi GPS dan mengupload foto</Text>
+            <Text style={styles.prosesSub}>Mengecek lokasi dan mengupload foto</Text>
           </View>
         )}
 
-        {/* STEP 4: Selesai */}
         {step === 'selesai' && (
           <View style={styles.selesaiSection}>
             <Text style={styles.selesaiIcon}>✅</Text>
@@ -438,7 +489,7 @@ export default function AbsenForm({ roleName, color, backRoute, requireGeofencin
             <Text style={styles.selesaiSub}>
               {new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
               {' · '}
-              {locationType === 'wh' ? selectedWH?.name : selectedProject?.name}
+              {locationType === 'wh' ? (selectedWH?.name ?? 'Warehouse') : locationType === 'lapangan' ? (selectedProject?.name ?? 'Lapangan') : 'Kantor'}
             </Text>
             {gpsStatus === 'fake' && (
               <Text style={styles.fakeWarning}>⚠️ Terdeteksi penggunaan fake GPS. Absensi tetap dicatat namun ditandai.</Text>
@@ -451,7 +502,7 @@ export default function AbsenForm({ roleName, color, backRoute, requireGeofencin
 
       </ScrollView>
 
-      {/* Modal Kamera Web */}
+      {/* Modal Kamera */}
       <Modal visible={showCamera} transparent animationType="fade" onRequestClose={() => { stopCamera(); setShowCamera(false) }}>
         <View style={styles.cameraOverlay}>
           <View style={styles.cameraBox}>
@@ -491,6 +542,8 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 16, fontWeight: '600', color: '#fff' },
   scroll: { flex: 1 },
   stepTitle: { fontSize: 16, fontWeight: '600', color: '#1a1a2e', marginBottom: 16 },
+  infoBox: { borderWidth: 1, borderRadius: 10, padding: 12, marginBottom: 16 },
+  infoText: { fontSize: 13, fontWeight: '500' },
   locOption: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 10, borderWidth: 2, borderColor: '#eee', gap: 12 },
   locOptionIcon: { fontSize: 28 },
   locOptionTitle: { fontSize: 14, fontWeight: '600', color: '#1a1a2e' },
