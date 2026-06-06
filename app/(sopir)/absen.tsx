@@ -1,4 +1,14 @@
-import AbsenForm from '../../components/AbsenForm'
+import AbsenPage from '../../components/AbsenPage'
+import SopirSidebar from '../../components/SopirSidebar'
+
 export default function SopirAbsen() {
-  return <AbsenForm roleName="Sopir" color="#e65100" backRoute="/(sopir)" locationRule="wh_only" />
+  return (
+    <AbsenPage
+      roleName="Sopir"
+      color="#e65100"
+      locationRule="wh_only"
+      SidebarComponent={SopirSidebar}
+      headerTitle="Absensi"
+    />
+  )
 }

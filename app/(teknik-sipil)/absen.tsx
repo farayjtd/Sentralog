@@ -1,4 +1,14 @@
-import AbsenForm from '../../components/AbsenForm'
+import AbsenPage from '../../components/AbsenPage'
+import TeknikSipilSidebar from '../../components/TeknikSipilSidebar'
+
 export default function TeknikSipilAbsen() {
-  return <AbsenForm roleName="Teknik Sipil" color="#1565c0" backRoute="/(teknik-sipil)" locationRule="free" />
+  return (
+    <AbsenPage
+      roleName="Teknik Sipil"
+      color="#1565c0"
+      locationRule="free"
+      SidebarComponent={TeknikSipilSidebar}
+      headerTitle="Absensi"
+    />
+  )
 }

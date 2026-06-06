@@ -1,4 +1,14 @@
-import AbsenForm from '../../components/AbsenForm'
+import AbsenPage from '../../components/AbsenPage'
+import KepalaWHSidebar from '../../components/KepalaWHSidebar'
+
 export default function KepalaWHAbsen() {
-  return <AbsenForm roleName="Kepala WH" color="#6a1b9a" backRoute="/(kepala-wh)" locationRule="wh_only" />
+  return (
+    <AbsenPage
+      roleName="Kepala WH"
+      color="#6a1b9a"
+      locationRule="wh_only"
+      SidebarComponent={KepalaWHSidebar}
+      headerTitle="Absensi"
+    />
+  )
 }

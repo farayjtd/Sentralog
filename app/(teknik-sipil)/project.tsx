@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
   TextInput, Modal, Alert, ActivityIndicator, StatusBar,
@@ -65,36 +65,22 @@ interface FormData {
 }
 
 const emptyForm: FormData = {
-  name: '',
-  client_name: '',
-  client_phone: '',
-  client_address: '',
-  install_lat: '',
-  install_lng: '',
-  deadline: '',
-  spec_notes: '',
-  warehouse_id: '',
+  name: '', client_name: '', client_phone: '',
+  client_address: '', install_lat: '', install_lng: '',
+  deadline: '', spec_notes: '', warehouse_id: '',
 }
 
 function Field({ label, value, onChange, placeholder, multiline, keyboardType }: {
-  label: string
-  value: string
-  onChange: (v: string) => void
-  placeholder?: string
-  multiline?: boolean
-  keyboardType?: any
+  label: string; value: string; onChange: (v: string) => void
+  placeholder?: string; multiline?: boolean; keyboardType?: any
 }) {
   return (
     <View style={{ marginBottom: 12 }}>
       <Text style={styles.fieldLabel}>{label}</Text>
       <TextInput
         style={[styles.fieldInput, multiline && { height: 80, textAlignVertical: 'top' }]}
-        value={value}
-        onChangeText={onChange}
-        placeholder={placeholder}
-        placeholderTextColor="#bbb"
-        multiline={multiline}
-        keyboardType={keyboardType ?? 'default'}
+        value={value} onChangeText={onChange} placeholder={placeholder}
+        placeholderTextColor="#bbb" multiline={multiline} keyboardType={keyboardType ?? 'default'}
       />
     </View>
   )
@@ -119,11 +105,8 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 function WHDropdown({ form, setForm, warehouses, showDropdown, setShowDropdown }: {
-  form: FormData
-  setForm: (f: FormData) => void
-  warehouses: Warehouse[]
-  showDropdown: boolean
-  setShowDropdown: (v: boolean) => void
+  form: FormData; setForm: (f: FormData) => void
+  warehouses: Warehouse[]; showDropdown: boolean; setShowDropdown: (v: boolean) => void
 }) {
   const selected = warehouses.find(w => w.id === form.warehouse_id)
   return (
@@ -138,20 +121,15 @@ function WHDropdown({ form, setForm, warehouses, showDropdown, setShowDropdown }
       {showDropdown && (
         <View style={styles.dropdownList}>
           {warehouses.map(w => {
-            const isBusy = (w.active_count ?? 0) >= 3
-            const color = isBusy ? '#c62828' : (w.active_count ?? 0) >= 1 ? '#f57f17' : '#2e7d32'
+            const color = (w.active_count ?? 0) >= 3 ? '#c62828' : (w.active_count ?? 0) >= 1 ? '#f57f17' : '#2e7d32'
             return (
               <TouchableOpacity
                 key={w.id}
                 style={[styles.dropdownItem, form.warehouse_id === w.id && styles.dropdownItemActive]}
                 onPress={() => { setForm({ ...form, warehouse_id: w.id }); setShowDropdown(false) }}
               >
-                <Text style={[styles.dropdownItemText, form.warehouse_id === w.id && { color: '#1a1a2e', fontWeight: '600' }]}>
-                  {w.name}
-                </Text>
-                <Text style={[styles.dropdownItemSub, { color }]}>
-                  {w.active_count} project aktif
-                </Text>
+                <Text style={[styles.dropdownItemText, form.warehouse_id === w.id && { fontWeight: '600' }]}>{w.name}</Text>
+                <Text style={[styles.dropdownItemSub, { color }]}>{w.active_count} project aktif</Text>
               </TouchableOpacity>
             )
           })}
@@ -179,6 +157,7 @@ export default function ProjectPage() {
   const [saving, setSaving] = useState(false)
   const [showWHDropdown, setShowWHDropdown] = useState(false)
   const [uploadingBOQ, setUploadingBOQ] = useState(false)
+  const [pendingBOQ, setPendingBOQ] = useState<File | null>(null)
   const [accComment, setAccComment] = useState('')
   const [accType, setAccType] = useState<'qc' | 'hasil' | null>(null)
   const [qcPhotos, setQcPhotos] = useState<any[]>([])
@@ -187,11 +166,20 @@ export default function ProjectPage() {
   const [selectedPhoto, setSelectedPhoto] = useState('')
 
   useEffect(() => {
-    if (user) {
-      fetchProjects()
-      fetchWarehouses()
-    }
+    if (user) { fetchProjects(); fetchWarehouses() }
   }, [user])
+
+  useEffect(() => {
+    if (Platform.OS !== 'web') return
+    const handler = (e: MessageEvent) => {
+      if (e.data?.type === 'INSTALL_LOCATION') {
+        setForm(prev => ({ ...prev, install_lat: e.data.lat.toFixed(6), install_lng: e.data.lng.toFixed(6) }))
+        setShowMap(false)
+      }
+    }
+    window.addEventListener('message', handler)
+    return () => window.removeEventListener('message', handler)
+  }, [])
 
   const fetchProjects = async () => {
     setLoading(true)
@@ -206,15 +194,8 @@ export default function ProjectPage() {
   }
 
   const fetchWarehouses = async () => {
-    const { data: whs } = await supabase
-      .from('warehouses')
-      .select('id, name')
-      .eq('is_active', true)
-    const { data: allProjects } = await supabase
-      .from('projects')
-      .select('warehouse_id, status')
-      .not('status', 'eq', 'selesai')
-
+    const { data: whs } = await supabase.from('warehouses').select('id, name').eq('is_active', true)
+    const { data: allProjects } = await supabase.from('projects').select('warehouse_id, status').not('status', 'eq', 'selesai')
     if (whs) {
       const withCount = whs.map(w => ({
         ...w,
@@ -225,37 +206,68 @@ export default function ProjectPage() {
   }
 
   const fetchProjectFiles = async (projectId: string) => {
-    const { data } = await supabase
-      .from('project_files')
-      .select('*')
-      .eq('project_id', projectId)
-      .order('uploaded_at', { ascending: false })
+    const { data } = await supabase.from('project_files').select('*').eq('project_id', projectId).order('uploaded_at', { ascending: false })
     if (data) setProjectFiles(data)
   }
 
   const fetchQCPhotos = async (projectId: string) => {
-    const { data: deliveries } = await supabase
-      .from('deliveries')
-      .select('id')
-      .eq('project_id', projectId)
-    if (!deliveries?.length) return
-
-    const deliveryIds = deliveries.map(d => d.id)
-    const { data: photos } = await supabase
-      .from('delivery_photos')
-      .select('*')
-      .in('delivery_id', deliveryIds)
-      .eq('stage', 'kepala_wh')
+    const { data: deliveries } = await supabase.from('deliveries').select('id').eq('project_id', projectId)
+    if (!deliveries?.length) { setQcPhotos([]); return }
+    const { data: photos } = await supabase.from('delivery_photos').select('*').in('delivery_id', deliveries.map(d => d.id)).eq('stage', 'kepala_wh')
     if (photos) setQcPhotos(photos)
   }
 
   const fetchHasilPhotos = async (projectId: string) => {
-    const { data } = await supabase
-      .from('project_files')
-      .select('*')
-      .eq('project_id', projectId)
-      .eq('file_type', 'foto_hasil_pasang')
+    const { data } = await supabase.from('project_files').select('*').eq('project_id', projectId).eq('file_type', 'foto_hasil_pasang')
     if (data) setHasilPhotos(data)
+  }
+
+  const pickBOQ = () => {
+    if (Platform.OS !== 'web') return
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = '.pdf,.xlsx,.xls,.doc,.docx'
+    input.onchange = (e: any) => {
+      const file = e.target.files[0]
+      if (file) setPendingBOQ(file)
+    }
+    input.click()
+  }
+
+  const uploadBOQFile = async (projectId: string, file: File): Promise<void> => {
+    try {
+      const fileName = `${projectId}/${Date.now()}-${file.name}`
+      const { error } = await supabase.storage.from('project-files').upload(fileName, file, { upsert: false, contentType: file.type })
+      if (error) throw error
+      const { data: urlData } = supabase.storage.from('project-files').getPublicUrl(fileName)
+      await supabase.from('project_files').insert({
+        project_id: projectId,
+        file_name: file.name,
+        file_url: urlData.publicUrl,
+        file_type: 'boq',
+        file_size: file.size,
+        uploaded_by: user!.id,
+      })
+    } catch (e: any) {
+      Alert.alert('Error Upload BOQ', e.message)
+    }
+  }
+
+  const uploadMoreFile = async (projectId: string) => {
+    if (Platform.OS !== 'web') return
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = '.pdf,.xlsx,.xls,.doc,.docx'
+    input.onchange = async (e: any) => {
+      const file = e.target.files[0]
+      if (!file) return
+      setUploadingBOQ(true)
+      await uploadBOQFile(projectId, file)
+      await fetchProjectFiles(projectId)
+      setUploadingBOQ(false)
+      Alert.alert('Berhasil', 'File berhasil diupload')
+    }
+    input.click()
   }
 
   const handleAdd = async () => {
@@ -265,7 +277,7 @@ export default function ProjectPage() {
     }
     setSaving(true)
     try {
-      const { error } = await supabase.from('projects').insert({
+      const { data, error } = await supabase.from('projects').insert({
         name: form.name,
         client_name: form.client_name,
         client_phone: form.client_phone || null,
@@ -277,12 +289,18 @@ export default function ProjectPage() {
         warehouse_id: form.warehouse_id,
         created_by: user!.id,
         status: 'input_spek',
-      })
+      }).select().single()
 
-      if (error) {
-        Alert.alert('Error', error.message)
+      if (error || !data) {
+        Alert.alert('Error', error?.message ?? 'Gagal membuat project')
         setSaving(false)
         return
+      }
+
+      // Upload BOQ jika ada
+      if (pendingBOQ) {
+        await uploadBOQFile(data.id, pendingBOQ)
+        setPendingBOQ(null)
       }
 
       Alert.alert('Berhasil', 'Project berhasil dibuat')
@@ -295,53 +313,13 @@ export default function ProjectPage() {
     setSaving(false)
   }
 
-  const uploadBOQ = async (projectId: string) => {
-    if (Platform.OS !== 'web') return
-    const input = document.createElement('input')
-    input.type = 'file'
-    input.accept = '.pdf,.xlsx,.xls,.doc,.docx'
-    input.onchange = async (e: any) => {
-      const file = e.target.files[0]
-      if (!file) return
-      setUploadingBOQ(true)
-      try {
-        const fileName = `${projectId}/${Date.now()}-${file.name}`
-        const { error } = await supabase.storage
-          .from('project-files')
-          .upload(fileName, file, { upsert: false, contentType: file.type })
-        if (error) throw error
-
-        const { data: urlData } = supabase.storage.from('project-files').getPublicUrl(fileName)
-
-        await supabase.from('project_files').insert({
-          project_id: projectId,
-          file_name: file.name,
-          file_url: urlData.publicUrl,
-          file_type: 'boq',
-          file_size: file.size,
-          uploaded_by: user!.id,
-        })
-
-        Alert.alert('Berhasil', 'File BOQ berhasil diupload')
-        fetchProjectFiles(projectId)
-      } catch (err: any) {
-        Alert.alert('Error', 'Gagal upload: ' + err.message)
-      }
-      setUploadingBOQ(false)
-    }
-    input.click()
-  }
-
   const handleACC = async (approved: boolean) => {
     if (!selectedProject) return
     setSaving(true)
     try {
       let newStatus = selectedProject.status
-      if (accType === 'qc') {
-        newStatus = approved ? 'pengiriman' : 'produksi'
-      } else if (accType === 'hasil') {
-        newStatus = approved ? 'selesai' : 'pemasangan'
-      }
+      if (accType === 'qc') newStatus = approved ? 'pengiriman' : 'produksi'
+      else if (accType === 'hasil') newStatus = approved ? 'selesai' : 'pemasangan'
 
       await supabase.from('projects').update({ status: newStatus }).eq('id', selectedProject.id)
       await supabase.from('project_logs').insert({
@@ -352,10 +330,7 @@ export default function ProjectPage() {
         note: accComment || (approved ? 'Disetujui oleh Teknik Sipil' : 'Ditolak oleh Teknik Sipil'),
       })
 
-      Alert.alert(
-        approved ? 'ACC Berhasil' : 'Ditolak',
-        approved ? 'Project dilanjutkan ke tahap berikutnya' : 'Project dikembalikan untuk diperbaiki'
-      )
+      Alert.alert(approved ? 'ACC Berhasil' : 'Ditolak', approved ? 'Project dilanjutkan' : 'Project dikembalikan')
       setShowACC(false)
       setAccComment('')
       setAccType(null)
@@ -379,6 +354,11 @@ export default function ProjectPage() {
     setAccType(type)
     setAccComment('')
     setShowACC(true)
+  }
+
+  const formatDate = (d?: string) => {
+    if (!d) return '-'
+    return new Date(d).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
   }
 
   const getMapHTML = () => {
@@ -432,29 +412,6 @@ ${form.install_lat ? `upd(${lat},${lng});` : ''}
 </script></body></html>`
   }
 
-  useEffect(() => {
-    if (Platform.OS !== 'web') return
-    const handler = (e: MessageEvent) => {
-      if (e.data?.type === 'INSTALL_LOCATION') {
-        setForm(prev => ({
-          ...prev,
-          install_lat: e.data.lat.toFixed(6),
-          install_lng: e.data.lng.toFixed(6),
-        }))
-        setShowMap(false)
-      }
-    }
-    window.addEventListener('message', handler)
-    return () => window.removeEventListener('message', handler)
-  }, [])
-
-  const formatDate = (d?: string) => {
-    if (!d) return '-'
-    return new Date(d).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
-  }
-
-  const needsACC = (status: string) => status === 'menunggu_acc_ts' || status === 'foto_hasil'
-
   const STATUS_FILTERS = [
     { label: 'Semua', value: 'all' },
     { label: 'Menunggu ACC', value: 'menunggu_acc' },
@@ -490,27 +447,17 @@ ${form.install_lat ? `upd(${lat},${lng});` : ''}
               <Text style={styles.pageTitle}>Project Saya</Text>
               <Text style={styles.pageSub}>{projects.length} project aktif</Text>
             </View>
-            <TouchableOpacity style={styles.addBtn} onPress={() => { setForm(emptyForm); setShowWHDropdown(false); setShowAdd(true) }}>
+            <TouchableOpacity style={styles.addBtn} onPress={() => { setForm(emptyForm); setPendingBOQ(null); setShowWHDropdown(false); setShowAdd(true) }}>
               <Text style={styles.addBtnText}>+ Buat Project</Text>
             </TouchableOpacity>
           </View>
 
-          <TextInput
-            style={styles.search}
-            placeholder="Cari nama project, klien, atau kode..."
-            placeholderTextColor="#aaa"
-            value={search}
-            onChangeText={setSearch}
-          />
+          <TextInput style={styles.search} placeholder="Cari nama project, klien, atau kode..." placeholderTextColor="#aaa" value={search} onChangeText={setSearch} />
 
           <View style={styles.filterWrap}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
               {STATUS_FILTERS.map(s => (
-                <TouchableOpacity
-                  key={s.value}
-                  style={[styles.filterChip, filterStatus === s.value && { backgroundColor: '#1565c0', borderColor: '#1565c0' }]}
-                  onPress={() => setFilterStatus(s.value)}
-                >
+                <TouchableOpacity key={s.value} style={[styles.filterChip, filterStatus === s.value && { backgroundColor: '#1565c0', borderColor: '#1565c0' }]} onPress={() => setFilterStatus(s.value)}>
                   <Text style={[styles.filterChipText, filterStatus === s.value && { color: '#fff' }]}>{s.label}</Text>
                 </TouchableOpacity>
               ))}
@@ -544,7 +491,9 @@ ${form.install_lat ? `upd(${lat},${lng});` : ''}
                   <View style={{ flex: 1.5, justifyContent: 'center' }}>
                     <StatusBadge status={p.status} />
                   </View>
-                  <Text style={[styles.td, { flex: 1 }]}>{p.deadline ? new Date(p.deadline).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }) : '-'}</Text>
+                  <Text style={[styles.td, { flex: 1 }]}>
+                    {p.deadline ? new Date(p.deadline).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }) : '-'}
+                  </Text>
                   <View style={[styles.actions, { flex: 2 }]}>
                     <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#e3f2fd' }]} onPress={() => openDetail(p)}>
                       <Text style={[styles.actionText, { color: '#1565c0' }]}>Detail</Text>
@@ -583,7 +532,7 @@ ${form.install_lat ? `upd(${lat},${lng});` : ''}
               <Field label="No. HP Klien" value={form.client_phone} onChange={v => setForm({ ...form, client_phone: v })} placeholder="08xxx" keyboardType="phone-pad" />
               <Field label="Alamat Klien" value={form.client_address} onChange={v => setForm({ ...form, client_address: v })} placeholder="Alamat lengkap klien" multiline />
               <Field label="Catatan Spesifikasi" value={form.spec_notes} onChange={v => setForm({ ...form, spec_notes: v })} placeholder="Catatan spesifikasi teknis" multiline />
-              <Field label="Deadline" value={form.deadline} onChange={v => setForm({ ...form, deadline: v })} placeholder="YYYY-MM-DD" />
+              <Field label="Deadline (YYYY-MM-DD)" value={form.deadline} onChange={v => setForm({ ...form, deadline: v })} placeholder="2026-12-31" />
 
               {/* Lokasi Pemasangan */}
               <Text style={styles.fieldLabel}>Lokasi Pemasangan</Text>
@@ -604,6 +553,19 @@ ${form.install_lat ? `upd(${lat},${lng});` : ''}
               )}
 
               <WHDropdown form={form} setForm={setForm} warehouses={warehouses} showDropdown={showWHDropdown} setShowDropdown={setShowWHDropdown} />
+
+              {/* Upload BOQ */}
+              <Text style={styles.fieldLabel}>File BOQ</Text>
+              <TouchableOpacity style={styles.uploadBOQBtn} onPress={pickBOQ}>
+                <Text style={styles.uploadBOQBtnText}>
+                  {pendingBOQ ? `✅ ${pendingBOQ.name}` : '📎 Pilih File BOQ (PDF/Excel/Word)'}
+                </Text>
+              </TouchableOpacity>
+              {!!pendingBOQ && (
+                <TouchableOpacity onPress={() => setPendingBOQ(null)} style={{ marginTop: 4 }}>
+                  <Text style={{ fontSize: 12, color: '#c62828' }}>✕ Hapus file</Text>
+                </TouchableOpacity>
+              )}
             </ScrollView>
             <View style={styles.modalFooter}>
               <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowAdd(false)}>
@@ -617,7 +579,7 @@ ${form.install_lat ? `upd(${lat},${lng});` : ''}
         </View>
       </Modal>
 
-      {/* MODAL DETAIL PROJECT */}
+      {/* MODAL DETAIL */}
       <Modal visible={showDetail} transparent animationType="fade" onRequestClose={() => setShowDetail(false)}>
         <View style={styles.overlay}>
           <View style={[styles.modalBox, { maxWidth: 600 }]}>
@@ -635,7 +597,6 @@ ${form.install_lat ? `upd(${lat},${lng});` : ''}
                 <View style={{ alignItems: 'center', marginBottom: 16 }}>
                   <StatusBadge status={selectedProject.status} />
                 </View>
-
                 <DRow label="Klien" value={selectedProject.client_name} />
                 <DRow label="No. HP Klien" value={selectedProject.client_phone ?? '-'} />
                 <DRow label="Alamat Klien" value={selectedProject.client_address ?? '-'} />
@@ -658,30 +619,15 @@ ${form.install_lat ? `upd(${lat},${lng});` : ''}
                 <View style={styles.fileSection}>
                   <View style={styles.fileSectionHeader}>
                     <Text style={styles.fileSectionTitle}>File BOQ & Dokumen</Text>
-                    <TouchableOpacity
-                      style={styles.uploadBtn}
-                      onPress={() => uploadBOQ(selectedProject.id)}
-                      disabled={uploadingBOQ}
-                    >
-                      {uploadingBOQ
-                        ? <ActivityIndicator size="small" color="#1565c0" />
-                        : <Text style={styles.uploadBtnText}>+ Upload File</Text>
-                      }
+                    <TouchableOpacity style={styles.uploadBtn} onPress={() => uploadMoreFile(selectedProject.id)} disabled={uploadingBOQ}>
+                      {uploadingBOQ ? <ActivityIndicator size="small" color="#1565c0" /> : <Text style={styles.uploadBtnText}>+ Upload File</Text>}
                     </TouchableOpacity>
                   </View>
                   {projectFiles.length === 0 ? (
                     <Text style={styles.emptyFile}>Belum ada file diupload</Text>
                   ) : projectFiles.map(f => (
-                    <TouchableOpacity
-                      key={f.id}
-                      style={styles.fileItem}
-                      onPress={() => {
-                        if (Platform.OS === 'web') window.open(f.file_url, '_blank')
-                      }}
-                    >
-                      <Text style={styles.fileIcon}>
-                        {f.file_type === 'boq' ? '📄' : '📎'}
-                      </Text>
+                    <TouchableOpacity key={f.id} style={styles.fileItem} onPress={() => { if (Platform.OS === 'web') window.open(f.file_url, '_blank') }}>
+                      <Text style={styles.fileIcon}>{f.file_type === 'boq' ? '📄' : '📎'}</Text>
                       <View style={{ flex: 1 }}>
                         <Text style={styles.fileName}>{f.file_name}</Text>
                         <Text style={styles.fileDate}>{formatDate(f.uploaded_at)}</Text>
@@ -691,7 +637,7 @@ ${form.install_lat ? `upd(${lat},${lng});` : ''}
                   ))}
                 </View>
 
-                {/* Foto QC dari Kepala WH */}
+                {/* Foto QC */}
                 {qcPhotos.length > 0 && (
                   <View style={styles.fileSection}>
                     <Text style={styles.fileSectionTitle}>Foto QC dari Kepala WH</Text>
@@ -710,7 +656,7 @@ ${form.install_lat ? `upd(${lat},${lng});` : ''}
                   </View>
                 )}
 
-                {/* Foto Hasil Pemasangan */}
+                {/* Foto Hasil */}
                 {hasilPhotos.length > 0 && (
                   <View style={styles.fileSection}>
                     <Text style={styles.fileSectionTitle}>Foto Hasil Pemasangan</Text>
@@ -744,9 +690,7 @@ ${form.install_lat ? `upd(${lat},${lng});` : ''}
         <View style={styles.overlay}>
           <View style={[styles.modalBox, { maxWidth: 420 }]}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
-                {accType === 'qc' ? 'ACC Hasil QC' : 'ACC Hasil Pemasangan'}
-              </Text>
+              <Text style={styles.modalTitle}>{accType === 'qc' ? 'ACC Hasil QC' : 'ACC Hasil Pemasangan'}</Text>
               <TouchableOpacity onPress={() => setShowACC(false)}>
                 <Text style={styles.closeBtn}>✕</Text>
               </TouchableOpacity>
@@ -754,33 +698,21 @@ ${form.install_lat ? `upd(${lat},${lng});` : ''}
             <View style={styles.modalBody}>
               <Text style={styles.accInfo}>
                 {accType === 'qc'
-                  ? 'Periksa foto QC dari Kepala WH. Jika sudah sesuai dengan spesifikasi, klik ACC. Jika tidak sesuai, klik Tolak.'
-                  : 'Periksa foto hasil pemasangan dari Mandor. Jika sudah sesuai, klik ACC untuk menyelesaikan project.'
-                }
+                  ? 'Periksa foto QC dari Kepala WH. ACC jika sudah sesuai spesifikasi, Tolak jika belum.'
+                  : 'Periksa foto hasil pemasangan dari Mandor. ACC untuk menyelesaikan project.'}
               </Text>
               <Text style={[styles.fieldLabel, { marginTop: 12 }]}>Komentar (opsional)</Text>
               <TextInput
                 style={[styles.fieldInput, { height: 80, textAlignVertical: 'top' }]}
-                value={accComment}
-                onChangeText={setAccComment}
-                placeholder="Tulis catatan atau alasan..."
-                placeholderTextColor="#bbb"
-                multiline
+                value={accComment} onChangeText={setAccComment}
+                placeholder="Tulis catatan atau alasan..." placeholderTextColor="#bbb" multiline
               />
             </View>
             <View style={styles.modalFooter}>
-              <TouchableOpacity
-                style={[styles.rejectBtn, saving && { opacity: 0.6 }]}
-                onPress={() => handleACC(false)}
-                disabled={saving}
-              >
+              <TouchableOpacity style={[styles.rejectBtn, saving && { opacity: 0.6 }]} onPress={() => handleACC(false)} disabled={saving}>
                 <Text style={styles.rejectBtnText}>✗ Tolak</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.approveBtn, saving && { opacity: 0.6 }]}
-                onPress={() => handleACC(true)}
-                disabled={saving}
-              >
+              <TouchableOpacity style={[styles.approveBtn, saving && { opacity: 0.6 }]} onPress={() => handleACC(true)} disabled={saving}>
                 {saving ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.approveBtnText}>✓ ACC</Text>}
               </TouchableOpacity>
             </View>
@@ -840,7 +772,7 @@ const styles = StyleSheet.create({
   tableRow: { flexDirection: 'row', paddingVertical: 10, paddingHorizontal: 12, borderRadius: 6, alignItems: 'center' },
   tableRowAlt: { backgroundColor: '#fff' },
   td: { fontSize: 13, color: '#333' },
-  tdCode: { fontSize: 11, color: '#888', fontFamily: 'monospace' },
+  tdCode: { fontSize: 11, color: '#888' },
   tdName: { fontSize: 13, fontWeight: '600', color: '#1a1a2e' },
   statusBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20, alignSelf: 'flex-start' },
   statusText: { fontSize: 11, fontWeight: '500' },
@@ -872,6 +804,8 @@ const styles = StyleSheet.create({
   dropdownItemActive: { backgroundColor: '#e3f2fd' },
   dropdownItemText: { fontSize: 13, color: '#333' },
   dropdownItemSub: { fontSize: 11, marginTop: 2 },
+  uploadBOQBtn: { borderWidth: 1, borderColor: '#1565c0', borderRadius: 8, paddingVertical: 12, alignItems: 'center', backgroundColor: '#e3f2fd', marginBottom: 4 },
+  uploadBOQBtnText: { fontSize: 13, color: '#1565c0', fontWeight: '500' },
   cancelBtn: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, borderWidth: 1, borderColor: '#ddd' },
   cancelText: { fontSize: 13, color: '#555' },
   saveBtn: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8, backgroundColor: '#1565c0' },

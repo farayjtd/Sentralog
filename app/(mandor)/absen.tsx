@@ -1,4 +1,14 @@
-import AbsenForm from '../../components/AbsenForm'
+import AbsenPage from '../../components/AbsenPage'
+import MandorSidebar from '../../components/MandorSidebar'
+
 export default function MandorAbsen() {
-  return <AbsenForm roleName="Mandor" color="#c62828" backRoute="/(mandor)" locationRule="lapangan_only" />
+  return (
+    <AbsenPage
+      roleName="Mandor"
+      color="#c62828"
+      locationRule="lapangan_only"
+      SidebarComponent={MandorSidebar}
+      headerTitle="Absensi"
+    />
+  )
 }
