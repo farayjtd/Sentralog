@@ -5,7 +5,8 @@ export default function KepalaWHAbsen() {
   return (
     <AbsenPage
       roleName="Kepala WH"
-      color="#6a1b9a"
+      role="kepala_wh"
+      color="#7c3aed"
       locationRule="wh_only"
       SidebarComponent={KepalaWHSidebar}
       headerTitle="Absensi"

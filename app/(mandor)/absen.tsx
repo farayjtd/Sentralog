@@ -5,7 +5,8 @@ export default function MandorAbsen() {
   return (
     <AbsenPage
       roleName="Mandor"
-      color="#c62828"
+      role="mandor"
+      color="#dc2626"
       locationRule="lapangan_only"
       SidebarComponent={MandorSidebar}
       headerTitle="Absensi"

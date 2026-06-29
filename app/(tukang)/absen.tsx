@@ -5,7 +5,8 @@ export default function TukangAbsen() {
   return (
     <AbsenPage
       roleName="Tukang"
-      color="#37474f"
+      role="tukang"
+      color="#475569"
       locationRule="both"
       SidebarComponent={TukangSidebar}
       headerTitle="Absensi"

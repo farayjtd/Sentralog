@@ -5,7 +5,8 @@ export default function SopirAbsen() {
   return (
     <AbsenPage
       roleName="Sopir"
-      color="#e65100"
+      role="sopir"
+      color="#ea580c"
       locationRule="wh_only"
       SidebarComponent={SopirSidebar}
       headerTitle="Absensi"

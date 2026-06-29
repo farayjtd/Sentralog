@@ -5,6 +5,8 @@ import {
   Platform, Image
 } from 'react-native'
 import TeknikSipilSidebar from '../../components/TeknikSipilSidebar'
+import AppShell from '../../components/AppShell'
+import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../stores/authStore'
 
@@ -429,28 +431,13 @@ ${form.install_lat ? `upd(${lat},${lng});` : ''}
   })
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#1565c0" />
-      <View style={[styles.header, { backgroundColor: '#1565c0' }]}>
-        <TouchableOpacity onPress={() => setSidebarOpen(!sidebarOpen)} style={styles.menuBtn}>
-          <Text style={styles.menuIcon}>☰</Text>
+    <AppShell role="teknik_sipil" title="Input Spek" subtitle={`${projects.length} pesanan aktif`} scroll={false}
+      headerRight={
+        <TouchableOpacity style={styles.addBtn} onPress={() => { setForm(emptyForm); setPendingBOQ(null); setShowWHDropdown(false); setShowAdd(true) }}>
+          <Ionicons name="add" size={16} color="#fff" />
+          <Text style={styles.addBtnText}>Buat Pesanan</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Data Project</Text>
-      </View>
-
-      <View style={styles.body}>
-        {sidebarOpen && <TeknikSipilSidebar />}
-        <View style={styles.main}>
-
-          <View style={styles.pageHeader}>
-            <View>
-              <Text style={styles.pageTitle}>Project Saya</Text>
-              <Text style={styles.pageSub}>{projects.length} project aktif</Text>
-            </View>
-            <TouchableOpacity style={styles.addBtn} onPress={() => { setForm(emptyForm); setPendingBOQ(null); setShowWHDropdown(false); setShowAdd(true) }}>
-              <Text style={styles.addBtnText}>+ Buat Project</Text>
-            </TouchableOpacity>
-          </View>
+      }>
 
           <TextInput style={styles.search} placeholder="Cari nama project, klien, atau kode..." placeholderTextColor="#aaa" value={search} onChangeText={setSearch} />
 
@@ -513,8 +500,6 @@ ${form.install_lat ? `upd(${lat},${lng});` : ''}
               ))}
             </ScrollView>
           )}
-        </View>
-      </View>
 
       {/* MODAL TAMBAH PROJECT */}
       <Modal visible={showAdd} transparent animationType="fade" onRequestClose={() => setShowAdd(false)}>
@@ -745,7 +730,7 @@ ${form.install_lat ? `upd(${lat},${lng});` : ''}
         </TouchableOpacity>
       </Modal>
 
-    </View>
+    </AppShell>
   )
 }
 
@@ -760,7 +745,7 @@ const styles = StyleSheet.create({
   pageHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   pageTitle: { fontSize: 20, fontWeight: 'bold', color: '#1a1a2e' },
   pageSub: { fontSize: 12, color: '#888', marginTop: 2 },
-  addBtn: { backgroundColor: '#1565c0', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8 },
+  addBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#1d4ed8', paddingHorizontal: 14, paddingVertical: 9, borderRadius: 10 },
   addBtnText: { color: '#fff', fontSize: 13, fontWeight: '600' },
   search: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#e5e5e5', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 10, fontSize: 13, marginBottom: 10, color: '#333' },
   filterWrap: { height: 40, marginBottom: 12 },

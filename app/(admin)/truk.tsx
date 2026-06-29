@@ -7,6 +7,12 @@ import AdminSidebar from '../../components/AdminSidebar'
 import AdminHeader from '../../components/AdminHeader'
 import { supabase } from '../../lib/supabase'
 
+const TRUCK_TYPES = [
+  { label: 'CDD', value: 'CDD' },
+  { label: 'Engkel', value: 'Engkel' },
+  { label: 'Fuso', value: 'Fuso' },
+];
+
 const TRUCK_STATUS = [
   { label: 'Standby', value: 'standby', color: '#2e7d32', bg: '#e8f5e9' },
   { label: 'Mengirim', value: 'on_delivery', color: '#1565c0', bg: '#e3f2fd' },
@@ -197,13 +203,32 @@ function TruckFormContent({
         autoCapitalize="characters"
       />
 
-      <Field
-        label="Tipe Kendaraan"
-        value={form.type}
-        onChange={v => setForm({ ...form, type: v })}
-        placeholder="Contoh: CDD, Engkel, Fuso"
-        autoCapitalize="words"
-      />
+      {/* Tipe Kendaraan */}
+      <Text style={styles.fieldLabel}>Tipe Kendaraan</Text>
+      <View style={styles.statusGrid}>
+        {TRUCK_TYPES.map(type => (
+          <TouchableOpacity
+            key={type.value}
+            style={[
+              styles.statusChip,
+              form.type === type.value && {
+                backgroundColor: '#2563EB',
+                borderColor: '#2563EB',
+              },
+            ]}
+            onPress={() => setForm({ ...form, type: type.value })}
+          >
+            <Text
+              style={[
+                styles.statusChipText,
+                form.type === type.value && { color: '#fff' },
+              ]}
+            >
+              {type.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View> 
 
       {/* Status */}
       <Text style={styles.fieldLabel}>Status</Text>

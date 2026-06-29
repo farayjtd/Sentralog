@@ -1,37 +1,21 @@
-import { View, Text, StyleSheet, StatusBar, TouchableOpacity } from 'react-native'
-import { useState } from 'react'
-import TukangSidebar from '../../components/TukangSidebar'
+import RoleDashboard, { Stat } from '../../components/RoleDashboard'
+import { supabase } from '../../lib/supabase'
+import { useAuthStore } from '../../stores/authStore'
 
-export default function TukangDashboard() {
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+export default function Dashboard() {
+  const { user } = useAuthStore()
+  const loadStats = async (): Promise<Stat[]> => {
+    const today = new Date().toISOString().slice(0, 10)
+    const { data } = await supabase.from('attendances').select('id, check_in_at').eq('user_id', user!.id).eq('date', today).maybeSingle()
+    return [
+      { value: data?.check_in_at ? 'Sudah' : 'Belum', label: 'Absen Hari Ini', icon: 'calendar-outline' },
+    ]
+  }
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#37474f" />
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => setSidebarOpen(!sidebarOpen)} style={styles.menuBtn}>
-          <Text style={styles.menuIcon}>☰</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Dashboard</Text>
-      </View>
-      <View style={styles.body}>
-        {sidebarOpen && <TukangSidebar />}
-        <View style={styles.main}>
-          <Text style={styles.title}>Selamat Datang 👋</Text>
-          <Text style={styles.sub}>Pilih menu di sidebar</Text>
-        </View>
-      </View>
-    </View>
+    <RoleDashboard
+      role="tukang"
+      greeting={`Halo ${user?.full_name ?? ''} — selamat bekerja.`}
+      loadStats={loadStats}
+    />
   )
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f0f2f5' },
-  header: { paddingTop: 48, paddingBottom: 14, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#37474f' },
-  menuBtn: { padding: 4 },
-  menuIcon: { fontSize: 20, color: '#fff' },
-  headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#fff' },
-  body: { flex: 1, flexDirection: 'row' },
-  main: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  title: { fontSize: 20, fontWeight: 'bold', color: '#1a1a2e' },
-  sub: { fontSize: 13, color: '#888', marginTop: 6 },
-})

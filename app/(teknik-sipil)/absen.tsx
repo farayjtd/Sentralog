@@ -5,7 +5,8 @@ export default function TeknikSipilAbsen() {
   return (
     <AbsenPage
       roleName="Teknik Sipil"
-      color="#1565c0"
+      role="teknik_sipil"
+      color="#1d4ed8"
       locationRule="free"
       SidebarComponent={TeknikSipilSidebar}
       headerTitle="Absensi"

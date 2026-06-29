@@ -1,37 +1,28 @@
-import { View, Text, StyleSheet, StatusBar, TouchableOpacity } from 'react-native'
-import { useState } from 'react'
-import KepalaWHSidebar from '../../components/KepalaWHSidebar'
+import RoleDashboard, { Stat } from '../../components/RoleDashboard'
+import { supabase } from '../../lib/supabase'
+import { useAuthStore } from '../../stores/authStore'
 
-export default function KepalaWHDashboard() {
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+export default function Dashboard() {
+  const { user } = useAuthStore()
+  const loadStats = async (): Promise<Stat[]> => {
+    const [wh, berjalan, ttd, truk] = await Promise.all([
+      supabase.from('warehouses').select('id'),
+      supabase.from('projects').select('id').not('status', 'eq', 'selesai'),
+      supabase.from('projects').select('id').in('status', ['cek_bahan_baku', 'qc_foto']),
+      supabase.from('trucks').select('id'),
+    ])
+    return [
+      { value: wh.data?.length ?? 0, label: 'Warehouse', icon: 'business-outline' },
+      { value: berjalan.data?.length ?? 0, label: 'Pesanan Berjalan', icon: 'trending-up-outline' },
+      { value: ttd.data?.length ?? 0, label: 'Menunggu TTD', icon: 'create-outline' },
+      { value: truk.data?.length ?? 0, label: 'Unit Truk', icon: 'car-outline' },
+    ]
+  }
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#6a1b9a" />
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => setSidebarOpen(!sidebarOpen)} style={styles.menuBtn}>
-          <Text style={styles.menuIcon}>☰</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Dashboard</Text>
-      </View>
-      <View style={styles.body}>
-        {sidebarOpen && <KepalaWHSidebar />}
-        <View style={styles.main}>
-          <Text style={styles.title}>Selamat Datang 👋</Text>
-          <Text style={styles.sub}>Pilih menu di sidebar</Text>
-        </View>
-      </View>
-    </View>
+    <RoleDashboard
+      role="kepala_wh"
+      greeting={`Halo ${user?.full_name ?? ''} — kelola gudang & pesanan.`}
+      loadStats={loadStats}
+    />
   )
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f0f2f5' },
-  header: { paddingTop: 48, paddingBottom: 14, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#6a1b9a' },
-  menuBtn: { padding: 4 },
-  menuIcon: { fontSize: 20, color: '#fff' },
-  headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#fff' },
-  body: { flex: 1, flexDirection: 'row' },
-  main: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  title: { fontSize: 20, fontWeight: 'bold', color: '#1a1a2e' },
-  sub: { fontSize: 13, color: '#888', marginTop: 6 },
-})

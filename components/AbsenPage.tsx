@@ -4,6 +4,10 @@ import {
   ActivityIndicator, Platform, StatusBar, Image, Alert, Modal
 } from 'react-native'
 import * as Location from 'expo-location'
+import { Ionicons } from '@expo/vector-icons'
+import AppShell from './AppShell'
+import { roleAccent } from '../lib/roles'
+import { c, sp, radius, font, shadow, numStyle } from '../lib/theme'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/authStore'
 
@@ -38,7 +42,8 @@ interface Props {
   color: string
   locationRule: LocationRule
   roleName: string
-  SidebarComponent: React.ComponentType
+  role?: string
+  SidebarComponent?: React.ComponentType
   headerTitle: string
 }
 
@@ -56,9 +61,9 @@ function getDistance(lat1: number, lng1: number, lat2: number, lng2: number): nu
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des']
 
-export default function AbsenPage({ color, locationRule, roleName, SidebarComponent, headerTitle }: Props) {
+export default function AbsenPage({ color, locationRule, roleName, role, SidebarComponent, headerTitle }: Props) {
   const { user } = useAuthStore()
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const accent = role ? roleAccent(role) : color
 
   // Absen form state
   const [showAbsenForm, setShowAbsenForm] = useState(false)
@@ -361,21 +366,7 @@ export default function AbsenPage({ color, locationRule, roleName, SidebarCompon
   const uniqueDays = new Set(attendances.map(a => a.date)).size
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={color} />
-      <View style={[styles.header, { backgroundColor: color }]}>
-        <TouchableOpacity onPress={() => setSidebarOpen(!sidebarOpen)} style={styles.menuBtn}>
-          <Text style={styles.menuIcon}>☰</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{headerTitle}</Text>
-      </View>
-
-      <View style={styles.body}>
-        {sidebarOpen && <SidebarComponent />}
-
-        <ScrollView style={styles.main} showsVerticalScrollIndicator={false}>
-          <View style={styles.content}>
-
+    <AppShell role={role ?? 'tukang'} title={headerTitle}>
             {/* ===== ABSEN HARI INI ===== */}
             <View style={styles.card}>
               <Text style={styles.cardTitle}>Absensi Hari Ini</Text>
@@ -637,10 +628,6 @@ export default function AbsenPage({ color, locationRule, roleName, SidebarCompon
               )}
             </View>
 
-          </View>
-        </ScrollView>
-      </View>
-
       {/* Modal Kamera */}
       <Modal visible={showCamera} transparent animationType="fade" onRequestClose={() => { stopCamera(); setShowCamera(false) }}>
         <View style={styles.cameraOverlay}>
@@ -663,85 +650,76 @@ export default function AbsenPage({ color, locationRule, roleName, SidebarCompon
           </View>
         </View>
       </Modal>
-
-    </View>
+    </AppShell>
   )
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f0f2f5' },
-  header: { paddingTop: Platform.OS === 'android' ? 48 : 60, paddingBottom: 14, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 12 },
-  menuBtn: { padding: 4 },
-  menuIcon: { fontSize: 20, color: '#fff' },
-  headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#fff' },
-  body: { flex: 1, flexDirection: 'row' },
-  main: { flex: 1 },
-  content: { padding: 16 },
-  card: { backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 16 },
-  cardTitle: { fontSize: 15, fontWeight: '600', color: '#1a1a2e', marginBottom: 4 },
-  dateText: { fontSize: 12, color: '#888', marginBottom: 12 },
-  todayCard: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#f8f9fa', borderRadius: 10, padding: 12, marginBottom: 8 },
+  card: { backgroundColor: c.surface, borderRadius: radius.lg, padding: sp(4), marginBottom: sp(4), borderWidth: 1, borderColor: c.line, ...shadow(1) },
+  cardTitle: { fontSize: font.h2, fontWeight: '800', color: c.ink, marginBottom: 4, letterSpacing: -0.3 },
+  dateText: { fontSize: font.small, color: c.muted, marginBottom: sp(3) },
+  todayCard: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: c.surfaceAlt, borderRadius: radius.md, padding: sp(3), marginBottom: sp(2), borderWidth: 1, borderColor: c.lineSoft },
   todayLeft: { flex: 1 },
-  badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12, alignSelf: 'flex-start', marginBottom: 4 },
-  badgeText: { fontSize: 11, fontWeight: '500' },
-  todayLoc: { fontSize: 13, fontWeight: '500', color: '#1a1a2e', marginBottom: 2 },
-  todayTime: { fontSize: 12, color: '#666' },
-  mockWarn: { fontSize: 11, color: '#e65100', marginTop: 4 },
-  todayPhoto: { width: 48, height: 48, borderRadius: 8, marginLeft: 8 },
-  absenBtn: { borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 12 },
-  absenBtnText: { color: '#fff', fontSize: 15, fontWeight: '600' },
-  absenForm: { borderWidth: 1, borderRadius: 12, padding: 14, marginTop: 12 },
-  absenFormHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  absenFormTitle: { fontSize: 14, fontWeight: '600' },
-  absenFormClose: { fontSize: 18, color: '#888' },
-  infoBox: { borderWidth: 1, borderRadius: 8, padding: 10, marginBottom: 12 },
-  infoText: { fontSize: 12, fontWeight: '500' },
-  locOption: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8f9fa', borderRadius: 10, padding: 12, marginBottom: 8, borderWidth: 2, borderColor: '#eee', gap: 10 },
+  badge: { paddingHorizontal: sp(2.5), paddingVertical: 4, borderRadius: radius.pill, alignSelf: 'flex-start', marginBottom: 4 },
+  badgeText: { fontSize: font.micro, fontWeight: '700' },
+  todayLoc: { fontSize: font.body, fontWeight: '600', color: c.ink, marginBottom: 2 },
+  todayTime: { fontSize: font.small, color: c.muted },
+  mockWarn: { fontSize: font.micro, color: c.danger, marginTop: 4, fontWeight: '600' },
+  todayPhoto: { width: 52, height: 52, borderRadius: radius.md, marginLeft: sp(2) },
+  absenBtn: { borderRadius: radius.md, paddingVertical: sp(3.5), alignItems: 'center', marginTop: sp(3), ...shadow(1) },
+  absenBtnText: { color: '#fff', fontSize: font.body, fontWeight: '700' },
+  absenForm: { borderWidth: 1, borderRadius: radius.lg, padding: sp(3.5), marginTop: sp(3), backgroundColor: c.surfaceAlt },
+  absenFormHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: sp(3) },
+  absenFormTitle: { fontSize: font.h3, fontWeight: '700' },
+  absenFormClose: { fontSize: 18, color: c.faint, fontWeight: '600' },
+  infoBox: { borderWidth: 1, borderRadius: radius.md, padding: sp(2.5), marginBottom: sp(3) },
+  infoText: { fontSize: font.small, fontWeight: '600' },
+  locOption: { flexDirection: 'row', alignItems: 'center', backgroundColor: c.surface, borderRadius: radius.md, padding: sp(3), marginBottom: sp(2), borderWidth: 1.5, borderColor: c.line, gap: sp(2.5) },
   locOptionIcon: { fontSize: 22 },
-  locOptionTitle: { fontSize: 13, fontWeight: '600', color: '#1a1a2e' },
-  subSection: { backgroundColor: '#f8f9fa', borderRadius: 10, padding: 12, marginBottom: 10 },
-  subLabel: { fontSize: 12, fontWeight: '500', color: '#444', marginBottom: 8 },
-  subOption: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 10, borderRadius: 8, borderWidth: 1, borderColor: '#eee', marginBottom: 6, backgroundColor: '#fff' },
-  subOptionText: { fontSize: 13, color: '#333' },
-  nextBtn: { borderRadius: 8, paddingVertical: 12, alignItems: 'center' },
-  nextBtnText: { color: '#fff', fontSize: 13, fontWeight: '600' },
+  locOptionTitle: { fontSize: font.body, fontWeight: '700', color: c.ink },
+  subSection: { backgroundColor: c.surface, borderRadius: radius.md, padding: sp(3), marginBottom: sp(2.5), borderWidth: 1, borderColor: c.lineSoft },
+  subLabel: { fontSize: font.small, fontWeight: '600', color: c.body, marginBottom: sp(2) },
+  subOption: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: sp(2.5), borderRadius: radius.sm, borderWidth: 1, borderColor: c.line, marginBottom: 6, backgroundColor: c.surface },
+  subOptionText: { fontSize: font.small, color: c.body },
+  nextBtn: { borderRadius: radius.md, paddingVertical: sp(3), alignItems: 'center' },
+  nextBtnText: { color: '#fff', fontSize: font.small, fontWeight: '700' },
   fotoWrap: { alignItems: 'center' },
-  photoPreview: { width: 200, height: 200, borderRadius: 12, marginBottom: 12 },
-  retakeBtn: { borderWidth: 1, borderColor: '#1a1a2e', borderRadius: 8, paddingVertical: 8, paddingHorizontal: 20, marginBottom: 8, width: '100%', alignItems: 'center' },
-  retakeBtnText: { fontSize: 13, color: '#1a1a2e' },
-  submitBtn: { borderRadius: 8, paddingVertical: 12, alignItems: 'center', width: '100%' },
-  submitBtnText: { color: '#fff', fontSize: 14, fontWeight: '600' },
-  prosesWrap: { alignItems: 'center', paddingVertical: 24 },
-  prosesText: { fontSize: 14, color: '#1a1a2e', marginTop: 12 },
-  selesaiWrap: { alignItems: 'center', paddingVertical: 16 },
-  selesaiIcon: { fontSize: 48, marginBottom: 8 },
-  selesaiTitle: { fontSize: 18, fontWeight: 'bold', color: '#1a1a2e', marginBottom: 4 },
-  selesaiSub: { fontSize: 13, color: '#666', marginBottom: 8 },
-  fakeWarn: { fontSize: 12, color: '#e65100', marginBottom: 8 },
-  doneBtn: { borderRadius: 8, paddingVertical: 10, paddingHorizontal: 28, alignItems: 'center', marginTop: 8 },
-  doneBtnText: { color: '#fff', fontSize: 13, fontWeight: '600' },
-  monthScroll: { marginBottom: 10 },
-  monthChip: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 16, borderWidth: 1, borderColor: '#ddd', marginRight: 8, backgroundColor: '#fff' },
-  monthChipText: { fontSize: 12, color: '#555' },
-  yearRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
-  yearBtn: { padding: 8 },
-  yearBtnText: { fontSize: 20, color: '#1a1a2e' },
-  yearText: { fontSize: 14, fontWeight: '600', color: '#1a1a2e', marginHorizontal: 16 },
-  summaryRow: { flexDirection: 'row', gap: 8, marginBottom: 14 },
-  summaryCard: { flex: 1, backgroundColor: '#f8f9fa', borderRadius: 8, padding: 10, borderLeftWidth: 3 },
-  summaryNum: { fontSize: 20, fontWeight: 'bold', color: '#1a1a2e' },
-  summaryLabel: { fontSize: 10, color: '#888', marginTop: 2 },
-  listHeader: { flexDirection: 'row', backgroundColor: '#f0f0f0', padding: 8, borderRadius: 6, marginBottom: 4 },
-  listTh: { fontSize: 11, fontWeight: '600', color: '#555' },
-  listRow: { flexDirection: 'row', paddingVertical: 8, paddingHorizontal: 4, alignItems: 'center' },
-  listRowAlt: { backgroundColor: '#f8f9fa', borderRadius: 4 },
-  listTd: { fontSize: 12, color: '#333' },
-  emptySmall: { textAlign: 'center', color: '#aaa', fontSize: 13, paddingVertical: 16 },
-  cameraOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center' },
-  cameraBox: { width: '90%', maxWidth: 400, backgroundColor: '#000', borderRadius: 16, overflow: 'hidden', height: 480 },
-  cameraHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 14, backgroundColor: '#1a1a1a' },
-  cameraTitle: { color: '#fff', fontSize: 14, fontWeight: '500' },
+  photoPreview: { width: 200, height: 200, borderRadius: radius.lg, marginBottom: sp(3) },
+  retakeBtn: { borderWidth: 1, borderColor: c.line, borderRadius: radius.md, paddingVertical: sp(2.5), paddingHorizontal: sp(5), marginBottom: sp(2), width: '100%', alignItems: 'center' },
+  retakeBtnText: { fontSize: font.small, color: c.body, fontWeight: '600' },
+  submitBtn: { borderRadius: radius.md, paddingVertical: sp(3), alignItems: 'center', width: '100%' },
+  submitBtnText: { color: '#fff', fontSize: font.body, fontWeight: '700' },
+  prosesWrap: { alignItems: 'center', paddingVertical: sp(6) },
+  prosesText: { fontSize: font.body, color: c.body, marginTop: sp(3) },
+  selesaiWrap: { alignItems: 'center', paddingVertical: sp(4) },
+  selesaiIcon: { fontSize: 48, marginBottom: sp(2) },
+  selesaiTitle: { fontSize: font.h1, fontWeight: '800', color: c.ink, marginBottom: 4 },
+  selesaiSub: { fontSize: font.small, color: c.muted, marginBottom: sp(2) },
+  fakeWarn: { fontSize: font.small, color: c.danger, marginBottom: sp(2), fontWeight: '600' },
+  doneBtn: { borderRadius: radius.md, paddingVertical: sp(2.5), paddingHorizontal: sp(7), alignItems: 'center', marginTop: sp(2) },
+  doneBtnText: { color: '#fff', fontSize: font.small, fontWeight: '700' },
+  monthScroll: { marginBottom: sp(2.5) },
+  monthChip: { paddingHorizontal: sp(3), paddingVertical: 6, borderRadius: radius.pill, borderWidth: 1, borderColor: c.line, marginRight: sp(2), backgroundColor: c.surface },
+  monthChipText: { fontSize: font.small, color: c.body, fontWeight: '600' },
+  yearRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: sp(3.5) },
+  yearBtn: { padding: sp(2) },
+  yearBtnText: { fontSize: 20, color: c.ink },
+  yearText: { fontSize: font.body, fontWeight: '700', color: c.ink, marginHorizontal: sp(4) },
+  summaryRow: { flexDirection: 'row', gap: sp(2), marginBottom: sp(3.5), flexWrap: 'wrap' },
+  summaryCard: { flexGrow: 1, flexBasis: 70, backgroundColor: c.surfaceAlt, borderRadius: radius.md, padding: sp(2.5), borderLeftWidth: 3, borderWidth: 1, borderColor: c.lineSoft },
+  summaryNum: { fontSize: font.h1, fontWeight: '800', color: c.ink, ...numStyle },
+  summaryLabel: { fontSize: font.micro, color: c.muted, marginTop: 2 },
+  listHeader: { flexDirection: 'row', backgroundColor: c.surfaceAlt, padding: sp(2), borderRadius: radius.sm, marginBottom: 4 },
+  listTh: { fontSize: font.micro, fontWeight: '700', color: c.muted, textTransform: 'uppercase', letterSpacing: 0.3 },
+  listRow: { flexDirection: 'row', paddingVertical: sp(2), paddingHorizontal: 4, alignItems: 'center' },
+  listRowAlt: { backgroundColor: c.surfaceAlt, borderRadius: 4 },
+  listTd: { fontSize: font.small, color: c.body },
+  emptySmall: { textAlign: 'center', color: c.faint, fontSize: font.small, paddingVertical: sp(4) },
+  cameraOverlay: { flex: 1, backgroundColor: 'rgba(15,23,42,0.85)', justifyContent: 'center', alignItems: 'center' },
+  cameraBox: { width: '90%', maxWidth: 400, backgroundColor: '#000', borderRadius: radius.lg, overflow: 'hidden', height: 480 },
+  cameraHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: sp(3.5), backgroundColor: '#111' },
+  cameraTitle: { color: '#fff', fontSize: font.body, fontWeight: '600' },
   cameraClose: { color: '#fff', fontSize: 18 },
-  captureBtn: { padding: 14, alignItems: 'center' },
-  captureBtnText: { color: '#fff', fontSize: 14, fontWeight: '600' },
+  captureBtn: { padding: sp(3.5), alignItems: 'center' },
+  captureBtnText: { color: '#fff', fontSize: font.body, fontWeight: '700' },
 })
